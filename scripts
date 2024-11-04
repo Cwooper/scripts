@@ -41,7 +41,7 @@ show_help() {
 list_scripts() {
     echo -e "${BLUE}Available scripts in $SCRIPT_DIR:${NC}"
     if [ -d "$SCRIPT_DIR" ]; then
-        ls -l "$SCRIPT_DIR" | awk '{print $9}'
+        ls -l "$SCRIPT_DIR" | awk 'NF && $9 != "" {print $9}'
     else
         echo -e "${RED}Scripts directory does not exist!${NC}"
         exit 1
@@ -52,7 +52,7 @@ list_scripts() {
 run_script() {
     local script_name="$1"
     shift # Remove script name from arguments
-    
+
     if [ -f "$SCRIPT_DIR/$script_name" ]; then
         echo -e "${GREEN}Running $script_name...${NC}"
         chmod +x "$SCRIPT_DIR/$script_name"
@@ -66,7 +66,7 @@ run_script() {
 # View script contents
 view_script() {
     local script_name="$1"
-    
+
     if [ -f "$SCRIPT_DIR/$script_name" ]; then
         echo -e "${BLUE}Contents of $script_name:${NC}"
         echo "----------------------------------------"
@@ -81,21 +81,21 @@ view_script() {
 # Create a new script
 create_script() {
     local script_name="$1"
-    
+
     if [ -z "$script_name" ]; then
         echo -e "${RED}Please provide a script name!${NC}"
         exit 1
     fi
-    
+
     if [[ ! "$script_name" =~ \.(sh|bash)$ ]]; then
         script_name="$script_name"
     fi
-    
+
     if [ -f "$SCRIPT_DIR/$script_name" ]; then
         echo -e "${RED}Script $script_name already exists!${NC}"
         exit 1
     fi
-    
+
     # Create script with basic template
     cat > "$SCRIPT_DIR/$script_name" << 'EOF'
 #!/bin/bash
@@ -108,7 +108,7 @@ create_script() {
 # Your code here
 
 EOF
-    
+
     chmod +x "$SCRIPT_DIR/$script_name"
     echo -e "${GREEN}Created script $script_name${NC}"
     echo "Would you like to edit it now? (y/n)"
@@ -121,7 +121,7 @@ EOF
 # Delete a script
 delete_script() {
     local script_name="$1"
-    
+
     if [ -f "$SCRIPT_DIR/$script_name" ]; then
         echo -e "${RED}Are you sure you want to delete $script_name? (y/n)${NC}"
         read -r response
@@ -138,7 +138,7 @@ delete_script() {
 # Edit a script using default editor
 edit_script() {
     local script_name="$1"
-    
+
     if [ -f "$SCRIPT_DIR/$script_name" ]; then
         if [ -n "$EDITOR" ]; then
             $EDITOR "$SCRIPT_DIR/$script_name"
@@ -200,4 +200,3 @@ case "$1" in
         show_help
         ;;
 esac
-
