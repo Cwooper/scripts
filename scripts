@@ -41,7 +41,7 @@ show_help() {
 list_scripts() {
     echo -e "${BLUE}Available scripts in $SCRIPT_DIR:${NC}"
     if [ -d "$SCRIPT_DIR" ]; then
-        ls -l "$SCRIPT_DIR" | awk 'NF && $9 != "" {print $9}'
+        find "$SCRIPT_DIR" -type f -executable -not -name "README.md" -exec basename {} \;
     else
         echo -e "${RED}Scripts directory does not exist!${NC}"
         exit 1
