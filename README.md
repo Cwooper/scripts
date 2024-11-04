@@ -6,7 +6,7 @@ Scripts that I made and use
 
 ```bash
 git clone git@github.com:Cwooper/scripts ~/.scripts
-echo "Export PATH=\$HOME/.scripts:\$PATH" >> ~/.bashrc
+echo "export PATH=\$HOME/.scripts:\$PATH" >> ~/.bashrc
 source ~/.bashrc
 
 # Install 
