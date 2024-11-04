@@ -1,0 +1,203 @@
+#!/bin/bash
+
+# script-manager - A utility to manage bash scripts
+# Features:
+# - List all scripts in specified directory
+# - Run scripts with arguments
+# - View script contents
+# - Create new scripts
+# - Delete scripts
+# - Edit scripts using default editor
+# - Add execution permissions automatically
+
+# Default directory for scripts
+SCRIPT_DIR="$HOME/.scripts"
+
+# Create scripts directory if it doesn't exist
+if [ ! -d "$SCRIPT_DIR" ]; then
+    mkdir -p "$SCRIPT_DIR"
+    echo "Created scripts directory at $SCRIPT_DIR"
+fi
+
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Print help message
+show_help() {
+    echo -e "${BLUE}Script Manager - Usage:${NC}"
+    echo "  -l, --list     : List all scripts"
+    echo "  -r, --run      : Run a script"
+    echo "  -v, --view     : View script contents"
+    echo "  -c, --create   : Create a new script"
+    echo "  -d, --delete   : Delete a script"
+    echo "  -e, --edit     : Edit a script"
+    echo "  -h, --help     : Show this help message"
+}
+
+# List all scripts in the directory
+list_scripts() {
+    echo -e "${BLUE}Available scripts in $SCRIPT_DIR:${NC}"
+    if [ -d "$SCRIPT_DIR" ]; then
+        ls -l "$SCRIPT_DIR" | awk '{print $9}'
+    else
+        echo -e "${RED}Scripts directory does not exist!${NC}"
+        exit 1
+    fi
+}
+
+# Run a script with arguments
+run_script() {
+    local script_name="$1"
+    shift # Remove script name from arguments
+    
+    if [ -f "$SCRIPT_DIR/$script_name" ]; then
+        echo -e "${GREEN}Running $script_name...${NC}"
+        chmod +x "$SCRIPT_DIR/$script_name"
+        "$SCRIPT_DIR/$script_name" "$@"
+    else
+        echo -e "${RED}Script $script_name not found!${NC}"
+        exit 1
+    fi
+}
+
+# View script contents
+view_script() {
+    local script_name="$1"
+    
+    if [ -f "$SCRIPT_DIR/$script_name" ]; then
+        echo -e "${BLUE}Contents of $script_name:${NC}"
+        echo "----------------------------------------"
+        cat "$SCRIPT_DIR/$script_name"
+        echo "----------------------------------------"
+    else
+        echo -e "${RED}Script $script_name not found!${NC}"
+        exit 1
+    fi
+}
+
+# Create a new script
+create_script() {
+    local script_name="$1"
+    
+    if [ -z "$script_name" ]; then
+        echo -e "${RED}Please provide a script name!${NC}"
+        exit 1
+    fi
+    
+    if [[ ! "$script_name" =~ \.(sh|bash)$ ]]; then
+        script_name="$script_name"
+    fi
+    
+    if [ -f "$SCRIPT_DIR/$script_name" ]; then
+        echo -e "${RED}Script $script_name already exists!${NC}"
+        exit 1
+    fi
+    
+    # Create script with basic template
+    cat > "$SCRIPT_DIR/$script_name" << 'EOF'
+#!/bin/bash
+
+# Script: script_name
+# Description: Add your description here
+# Author: Add your name here
+# Date: $(date +%Y-%m-%d)
+
+# Your code here
+
+EOF
+    
+    chmod +x "$SCRIPT_DIR/$script_name"
+    echo -e "${GREEN}Created script $script_name${NC}"
+    echo "Would you like to edit it now? (y/n)"
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        edit_script "$script_name"
+    fi
+}
+
+# Delete a script
+delete_script() {
+    local script_name="$1"
+    
+    if [ -f "$SCRIPT_DIR/$script_name" ]; then
+        echo -e "${RED}Are you sure you want to delete $script_name? (y/n)${NC}"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            rm "$SCRIPT_DIR/$script_name"
+            echo -e "${GREEN}Deleted $script_name${NC}"
+        fi
+    else
+        echo -e "${RED}Script $script_name not found!${NC}"
+        exit 1
+    fi
+}
+
+# Edit a script using default editor
+edit_script() {
+    local script_name="$1"
+    
+    if [ -f "$SCRIPT_DIR/$script_name" ]; then
+        if [ -n "$EDITOR" ]; then
+            $EDITOR "$SCRIPT_DIR/$script_name"
+        elif command -v nano >/dev/null 2>&1; then
+            nano "$SCRIPT_DIR/$script_name"
+        elif command -v vim >/dev/null 2>&1; then
+            vim "$SCRIPT_DIR/$script_name"
+        else
+            echo -e "${RED}No suitable editor found!${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${RED}Script $script_name not found!${NC}"
+        exit 1
+    fi
+}
+
+# Main script logic
+case "$1" in
+    -l|--list)
+        list_scripts
+        ;;
+    -r|--run)
+        if [ -z "$2" ]; then
+            echo -e "${RED}Please provide a script name to run!${NC}"
+            exit 1
+        fi
+        run_script "$2" "${@:3}"
+        ;;
+    -v|--view)
+        if [ -z "$2" ]; then
+            echo -e "${RED}Please provide a script name to view!${NC}"
+            exit 1
+        fi
+        view_script "$2"
+        ;;
+    -c|--create)
+        if [ -z "$2" ]; then
+            echo -e "${RED}Please provide a name for the new script!${NC}"
+            exit 1
+        fi
+        create_script "$2"
+        ;;
+    -d|--delete)
+        if [ -z "$2" ]; then
+            echo -e "${RED}Please provide a script name to delete!${NC}"
+            exit 1
+        fi
+        delete_script "$2"
+        ;;
+    -e|--edit)
+        if [ -z "$2" ]; then
+            echo -e "${RED}Please provide a script name to edit!${NC}"
+            exit 1
+        fi
+        edit_script "$2"
+        ;;
+    -h|--help|*)
+        show_help
+        ;;
+esac
+
