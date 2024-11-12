@@ -1,0 +1,177 @@
+#!/bin/bash
+
+# Script: pdf-concat
+# Description: Combines multiple PDF files into a single PDF
+# Author: Konnor Kooi
+# Date: 2024-11-11
+
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Function to print status messages
+print_status() {
+    echo -e "${CYAN}=>${NC} $1"
+}
+
+# Function to print success messages
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+# Function to print error messages
+print_error() {
+    echo -e "${RED}✗${NC} $1" >&2
+}
+
+# Function to show help message
+show_help() {
+    echo -e "
+    ${GREEN}PDF Concatenator${NC}
+    A tool to combine multiple PDF files into a single PDF
+
+    ${BOLD}USAGE${NC}
+      $(basename "$0") [options] [files...]
+
+    ${BOLD}OPTIONS${NC}
+      ${CYAN}-o${NC}, ${CYAN}--output${NC}    NAME      Output filename (default: combined.pdf)
+      ${CYAN}-d${NC}, ${CYAN}--debug${NC}              Enable debug output
+      ${CYAN}-h${NC}, ${CYAN}--help${NC}               Show this help message
+
+    ${BOLD}EXAMPLES${NC}
+      • Combine all PDFs in current directory:
+        $(basename "$0") .
+      
+      • Combine specific PDF files:
+        $(basename "$0") file1.pdf file2.pdf file3.pdf
+      
+      • Combine with custom output name:
+        $(basename "$0") -o merged.pdf file1.pdf file2.pdf
+      
+      • Combine all PDFs in specific directory:
+        $(basename "$0") /path/to/directory
+
+    ${BOLD}NOTES${NC}
+      • Requires pdftk to be installed
+      • Files are combined in alphabetical order when using directory mode
+      • Output file is created in the current directory"
+}
+
+# Default values
+OUTPUT_FILE="combined.pdf"
+DEBUG=false
+PDF_FILES=()
+DIRECTORY_MODE=false
+
+# Check if pdftk is installed
+if ! command -v pdftk &> /dev/null; then
+    print_error "pdftk is not installed. Please install it first:"
+    echo -e "${BLUE}For Debian/Ubuntu:${NC}"
+    echo "    sudo apt-get install pdftk"
+    exit 1
+fi
+
+# Function to process directory
+process_directory() {
+    local dir="$1"
+    if [ ! -d "$dir" ]; then
+        print_error "Directory does not exist: $dir"
+        exit 1
+    fi
+
+    local dir_path="$(cd "$dir" && pwd)"
+    [ "$DEBUG" = true ] && print_status "Scanning directory: $dir_path"
+
+    # Get all PDF files in directory
+    while IFS= read -r -d '' file; do
+        PDF_FILES+=("$file")
+    done < <(find "$dir_path" -maxdepth 1 -type f -name "*.pdf" -print0 | sort -z)
+
+    if [ ${#PDF_FILES[@]} -eq 0 ]; then
+        print_error "No PDF files found in directory: $dir_path"
+        exit 1
+    fi
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -o|--output)
+            OUTPUT_FILE="$2"
+            # Add .pdf extension if not present
+            [[ "$OUTPUT_FILE" != *.pdf ]] && OUTPUT_FILE="${OUTPUT_FILE}.pdf"
+            shift 2
+            ;;
+        -d|--debug)
+            DEBUG=true
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            # Check if it's a directory
+            if [ -d "$1" ]; then
+                DIRECTORY_MODE=true
+                process_directory "$1"
+                shift
+            # Check if it's a PDF file
+            elif [[ "$1" == *.pdf ]]; then
+                if [ -f "$1" ]; then
+                    PDF_FILES+=("$1")
+                else
+                    print_error "File does not exist: $1"
+                    exit 1
+                fi
+                shift
+            else
+                print_error "Invalid input: $1"
+                show_help
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+# Check if we have any files to process
+if [ ${#PDF_FILES[@]} -eq 0 ]; then
+    # If no files specified, try current directory
+    if [ "$DIRECTORY_MODE" = false ]; then
+        process_directory "."
+    else
+        print_error "No PDF files specified"
+        show_help
+        exit 1
+    fi
+fi
+
+# Check if output file exists
+if [ -f "$OUTPUT_FILE" ]; then
+    print_error "Output file already exists: $OUTPUT_FILE"
+    exit 1
+fi
+
+# Debug output
+if [ "$DEBUG" = true ]; then
+    print_status "Files to be combined:"
+    for file in "${PDF_FILES[@]}"; do
+        echo "  - $(basename "$file")"
+    done
+    echo
+fi
+
+# Combine PDFs
+print_status "Combining ${#PDF_FILES[@]} PDF files..."
+if pdftk "${PDF_FILES[@]}" cat output "$OUTPUT_FILE" 2>/dev/null; then
+    print_success "PDFs combined successfully into: $OUTPUT_FILE"
+    print_status "Total files combined: ${#PDF_FILES[@]}"
+else
+    print_error "Failed to combine PDFs"
+    [ -f "$OUTPUT_FILE" ] && rm "$OUTPUT_FILE"
+    exit 1
+fi
