@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Script: convert-docx-to-pdf
 # Description: Converts DOCX files to PDF format in a specified directory
 # Author: Konnor Kooi
@@ -100,7 +99,6 @@ convert_directory() {
     local dir="$1"
     local converted=0
     local failed=0
-
     [ "$DEBUG" = true ] && print_status "Processing directory: $dir"
 
     # Find all DOCX files in the current directory
@@ -119,27 +117,32 @@ convert_directory() {
     # Process subdirectories if recursive flag is set
     if [ "$RECURSIVE" = true ]; then
         while IFS= read -r -d '' subdir; do
-            local sub_results=($(convert_directory "$subdir"))
-            converted=$((converted + sub_results[0]))
-            failed=$((failed + sub_results[1]))
+            # Use a special delimiter (|) to separate the numbers
+            local sub_result
+            sub_result=$(convert_directory "$subdir")
+            local sub_converted=${sub_result%|*}
+            local sub_failed=${sub_result#*|}
+            converted=$((converted + sub_converted))
+            failed=$((failed + sub_failed))
         done < <(find "$dir" -mindepth 1 -maxdepth 1 -type d -print0)
     fi
 
-    echo "$converted $failed"
+    # Return results with a special delimiter
+    echo "${converted}|${failed}"
 }
 
 # Main execution
 print_status "Starting conversion in: $START_PATH"
 
-# Get conversion results
-results=($(convert_directory "$START_PATH"))
-converted=${results[0]}
-failed=${results[1]}
+# Get conversion results using the delimiter
+result=$(convert_directory "$START_PATH")
+converted=${result%|*}
+failed=${result#*|}
 
 # Print summary
 echo
 print_status "Conversion completed!"
 print_success "Successfully converted: $converted files"
-if [ $failed -gt 0 ]; then
+if [ "$failed" -gt 0 ]; then
     print_error "Failed to convert: $failed files"
 fi
