@@ -35,12 +35,12 @@ print_debug() {
 }
 
 # Default values
-START_PATH="$(pwd)"  # Use full path by default
-IS_FILE=false        # Flag to indicate if input is a file
-IGNORE_PATHS=("node_modules" ".*" "__pycache__")  # Auto-ignore node_modules and dotfiles
+START_PATH="$(pwd)"                              # Use full path by default
+IS_FILE=false                                    # Flag to indicate if input is a file
+IGNORE_PATHS=("node_modules" ".*" "__pycache__") # Auto-ignore node_modules and dotfiles
 TEMP_FILE="/tmp/ai-digest-$$.md"
 CLIPBOARD_CMD=""
-MAX_SIZE_MB=10  # Maximum size limit in MB
+MAX_SIZE_MB=10 # Maximum size limit in MB
 CURRENT_SIZE=0
 DEBUG=false
 
@@ -88,39 +88,39 @@ show_help() {
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -p|--path)
-            if [ -f "$2" ]; then
-                START_PATH="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
-                IS_FILE=true
-            elif [ -d "$2" ]; then
-                START_PATH="$(cd "$2" && pwd)"
-            else
-                print_error "Path does not exist: $2"
-                exit 1
-            fi
-            shift 2
-            ;;
-        -i|--ignore)
-            IGNORE_PATHS+=("$2")
-            shift 2
-            ;;
-        -m|--max-size)
-            MAX_SIZE_MB="$2"
-            shift 2
-            ;;
-        -d|--debug)
-            DEBUG=true
-            shift
-            ;;
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        *)
-            print_error "Unknown option: $1"
-            show_help
+    -p | --path)
+        if [ -f "$2" ]; then
+            START_PATH="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+            IS_FILE=true
+        elif [ -d "$2" ]; then
+            START_PATH="$(cd "$2" && pwd)"
+        else
+            print_error "Path does not exist: $2"
             exit 1
-            ;;
+        fi
+        shift 2
+        ;;
+    -i | --ignore)
+        IGNORE_PATHS+=("$2")
+        shift 2
+        ;;
+    -m | --max-size)
+        MAX_SIZE_MB="$2"
+        shift 2
+        ;;
+    -d | --debug)
+        DEBUG=true
+        shift
+        ;;
+    -h | --help)
+        show_help
+        exit 0
+        ;;
+    *)
+        print_error "Unknown option: $1"
+        show_help
+        exit 1
+        ;;
     esac
 done
 
@@ -168,7 +168,7 @@ should_ignore() {
 # Function to check file size and update total
 check_size() {
     local new_size=$(stat -f%z "$TEMP_FILE" 2>/dev/null || stat -c%s "$TEMP_FILE")
-    CURRENT_SIZE=$((new_size / 1024 / 1024))  # Convert to MB
+    CURRENT_SIZE=$((new_size / 1024 / 1024)) # Convert to MB
 
     if [ $CURRENT_SIZE -gt $MAX_SIZE_MB ]; then
         print_error "Maximum size limit (${MAX_SIZE_MB}MB) exceeded! Stopping..."
@@ -181,7 +181,7 @@ check_size() {
 process_file() {
     local file="$1"
     local relative_path="${file#$START_PATH}"
-    relative_path="${relative_path#/}"  # Remove leading slash
+    relative_path="${relative_path#/}" # Remove leading slash
 
     # Skip if file should be ignored
     if should_ignore "$file"; then
@@ -192,7 +192,7 @@ process_file() {
     if file "$file" | grep -q text; then
         # Check file size before processing
         local file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file")
-        file_size=$((file_size / 1024 / 1024))  # Convert to MB
+        file_size=$((file_size / 1024 / 1024)) # Convert to MB
 
         if [ $file_size -gt $((MAX_SIZE_MB / 2)) ]; then
             print_debug "Skipping large file ($file_size MB): $file"
@@ -202,15 +202,15 @@ process_file() {
         print_debug "Processing file: $file"
 
         # Add file information with just the relative path
-        echo "## $relative_path" >> "$TEMP_FILE"
+        echo "## $relative_path" >>"$TEMP_FILE"
 
         # Determine file type for syntax highlighting
         local ext="${file##*.}"
-        printf '\n```%s\n' "$ext" >> "$TEMP_FILE"
-        cat "$file" >> "$TEMP_FILE" || {
+        printf '\n```%s\n' "$ext" >>"$TEMP_FILE"
+        cat "$file" >>"$TEMP_FILE" || {
             print_error "Failed to read file: $file"
         }
-        printf '\n```\n\n' >> "$TEMP_FILE"
+        printf '\n```\n\n' >>"$TEMP_FILE"
 
         if ! check_size; then
             print_error "Size limit exceeded after processing: $file"
@@ -254,13 +254,34 @@ create_markdown() {
     return 0
 }
 
+# Function to format file size in human-readable format
+format_size() {
+    local size=$1
+    local units=("B" "KB" "MB" "GB")
+    local unit=0
+    local max_unit=3 # units array length - 1
+
+    while [ $unit -lt $max_unit ]; do
+        # Use bc for decimal comparison
+        if [ $(echo "$size < 1024" | bc) -eq 1 ]; then
+            break
+        fi
+        size=$(echo "scale=2; $size/1024" | bc)
+        unit=$((unit + 1))
+    done
+
+    # Round to 2 decimal places and trim trailing zeros
+    size=$(echo $size | awk '{printf "%.2f\n", $0}' | sed 's/\.00$//')
+    echo "${size}${units[$unit]}"
+}
+
 # Create temporary file
-> "$TEMP_FILE"
+>"$TEMP_FILE"
 
 # Add header to digest
-echo "# AI Digest" >> "$TEMP_FILE"
-echo "Generated on $(date '+%Y-%m-%d %H:%M:%S')" >> "$TEMP_FILE"
-echo >> "$TEMP_FILE"
+echo "# AI Digest" >>"$TEMP_FILE"
+echo "Generated on $(date '+%Y-%m-%d %H:%M:%S')" >>"$TEMP_FILE"
+echo >>"$TEMP_FILE"
 
 if [ "$IS_FILE" = true ]; then
     # Process single file
@@ -272,25 +293,25 @@ if [ "$IS_FILE" = true ]; then
 else
     # Add tree visualization if available
     if command -v tree >/dev/null 2>&1; then
-        echo "## Directory Structure" >> "$TEMP_FILE"
-        echo >> "$TEMP_FILE"
-        echo '```' >> "$TEMP_FILE"
+        echo "## Directory Structure" >>"$TEMP_FILE"
+        echo >>"$TEMP_FILE"
+        echo '```' >>"$TEMP_FILE"
 
         # Build ignore patterns for tree
         TREE_IGNORE=()
         for pattern in "${IGNORE_PATHS[@]}"; do
-            if [[ "$pattern" != ".*" ]]; then  # Handle dotfiles separately
+            if [[ "$pattern" != ".*" ]]; then # Handle dotfiles separately
                 TREE_IGNORE+=(-I "$pattern")
             fi
         done
 
         # Run tree with ignore patterns and additional flags
-        tree -a --charset=ascii -I "node_modules" "${TREE_IGNORE[@]}" --dirsfirst "$START_PATH" 2>/dev/null >> "$TEMP_FILE"
+        tree -a --charset=ascii -I "node_modules" "${TREE_IGNORE[@]}" --dirsfirst "$START_PATH" 2>/dev/null >>"$TEMP_FILE"
 
-        echo '```' >> "$TEMP_FILE"
-        echo >> "$TEMP_FILE"
-        echo "## Contents" >> "$TEMP_FILE"
-        echo >> "$TEMP_FILE"
+        echo '```' >>"$TEMP_FILE"
+        echo >>"$TEMP_FILE"
+        echo "## Contents" >>"$TEMP_FILE"
+        echo >>"$TEMP_FILE"
     fi
 
     # Generate markdown content for directory
@@ -318,9 +339,10 @@ else
     exit 1
 fi
 
-# Display file size
-size=$(du -h "$TEMP_FILE" | cut -f1)
-print_status "Digest size: $size"
+# Get and display the actual file size
+size_in_bytes=$(stat -f%z "$TEMP_FILE" 2>/dev/null || stat -c%s "$TEMP_FILE")
+formatted_size=$(format_size $size_in_bytes)
+print_status "Digest size: $formatted_size"
 
 # Cleanup
 rm "$TEMP_FILE"
