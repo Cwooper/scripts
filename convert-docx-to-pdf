@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script: convert-docx-to-pdf
-# Description: Converts DOCX files to PDF format in a specified directory
+# Description: Converts specified DOCX files to PDF format
 # Author: Konnor Kooi
 # Date: 2024-11-11
 
@@ -34,24 +34,22 @@ show_help() {
     A tool to convert DOCX files to PDF format
 
     ${BOLD}USAGE${NC}
-      $(basename "$0") [options]
+      $(basename "$0") [options] file1.docx [file2.docx ...]
 
     ${BOLD}OPTIONS${NC}
-      ${CYAN}-p${NC}, ${CYAN}--path${NC}     PATH      Directory containing DOCX files
-      ${CYAN}-r${NC}, ${CYAN}--recursive${NC}          Process subdirectories recursively
-      ${CYAN}-d${NC}, ${CYAN}--debug${NC}              Enable debug output
-      ${CYAN}-h${NC}, ${CYAN}--help${NC}               Show this help message
+      ${CYAN}-o${NC}, ${CYAN}--outdir${NC}    DIR       Output directory for PDF files (default: same as input)
+      ${CYAN}-d${NC}, ${CYAN}--debug${NC}               Enable debug output
+      ${CYAN}-h${NC}, ${CYAN}--help${NC}                Show this help message
 
     ${BOLD}NOTES${NC}
-      • Files are converted in place (PDFs created in same directory)
+      • By default, PDFs are created in the same directory as the input files
       • Requires LibreOffice to be installed
-      • Use --recursive to process all DOCX files in subdirectories
-      • Use --debug to see detailed conversion information"
+      • Use --debug to see detailed conversion information
+      • Multiple files can be converted in a single command"
 }
 
 # Default values
-START_PATH="$(pwd)"  # Use current directory by default
-RECURSIVE=false
+OUTPUT_DIR=""
 DEBUG=false
 
 # Check if libreoffice is installed
@@ -63,20 +61,17 @@ if ! command -v libreoffice &> /dev/null; then
 fi
 
 # Parse command line arguments
+FILES=()
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -p|--path)
+        -o|--outdir)
             if [ -d "$2" ]; then
-                START_PATH="$(cd "$2" && pwd)"
+                OUTPUT_DIR="$(cd "$2" && pwd)"
             else
-                print_error "Directory does not exist: $2"
+                print_error "Output directory does not exist: $2"
                 exit 1
             fi
             shift 2
-            ;;
-        -r|--recursive)
-            RECURSIVE=true
-            shift
             ;;
         -d|--debug)
             DEBUG=true
@@ -86,58 +81,53 @@ while [[ $# -gt 0 ]]; do
             show_help
             exit 0
             ;;
-        *)
+        -*)
             print_error "Unknown option: $1"
             show_help
             exit 1
             ;;
+        *)
+            if [[ $1 == *.docx ]]; then
+                if [ -f "$1" ]; then
+                    FILES+=("$1")
+                else
+                    print_error "File does not exist: $1"
+                    exit 1
+                fi
+            else
+                print_error "Not a DOCX file: $1"
+                exit 1
+            fi
+            shift
+            ;;
     esac
 done
 
-# Function to convert files in a directory
-convert_directory() {
-    local dir="$1"
-    local converted=0
-    local failed=0
-    [ "$DEBUG" = true ] && print_status "Processing directory: $dir"
+# Check if any files were provided
+if [ ${#FILES[@]} -eq 0 ]; then
+    print_error "No input files specified"
+    show_help
+    exit 1
+fi
 
-    # Find all DOCX files in the current directory
-    while IFS= read -r -d '' file; do
-        [ "$DEBUG" = true ] && print_status "Converting: $file"
-        
-        if libreoffice --headless --convert-to pdf "$file" --outdir "$(dirname "$file")" 2>/dev/null; then
-            ((converted++))
-            print_success "Converted: $(basename "$file")"
-        else
-            ((failed++))
-            print_error "Failed to convert: $(basename "$file")"
-        fi
-    done < <(find "$dir" -maxdepth 1 -type f -name "*.docx" -print0)
+# Convert files
+converted=0
+failed=0
 
-    # Process subdirectories if recursive flag is set
-    if [ "$RECURSIVE" = true ]; then
-        while IFS= read -r -d '' subdir; do
-            # Use a special delimiter (|) to separate the numbers
-            local sub_result
-            sub_result=$(convert_directory "$subdir")
-            local sub_converted=${sub_result%|*}
-            local sub_failed=${sub_result#*|}
-            converted=$((converted + sub_converted))
-            failed=$((failed + sub_failed))
-        done < <(find "$dir" -mindepth 1 -maxdepth 1 -type d -print0)
+for file in "${FILES[@]}"; do
+    [ "$DEBUG" = true ] && print_status "Converting: $file"
+    
+    # Determine output directory
+    outdir="${OUTPUT_DIR:-$(dirname "$file")}"
+    
+    if libreoffice --headless --convert-to pdf "$file" --outdir "$outdir" 2>/dev/null; then
+        ((converted++))
+        print_success "Converted: $(basename "$file")"
+    else
+        ((failed++))
+        print_error "Failed to convert: $(basename "$file")"
     fi
-
-    # Return results with a special delimiter
-    echo "${converted}|${failed}"
-}
-
-# Main execution
-print_status "Starting conversion in: $START_PATH"
-
-# Get conversion results using the delimiter
-result=$(convert_directory "$START_PATH")
-converted=${result%|*}
-failed=${result#*|}
+done
 
 # Print summary
 echo
