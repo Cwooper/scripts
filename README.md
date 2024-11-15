@@ -10,6 +10,6 @@ echo "export PATH=\$HOME/.scripts:\$PATH" >> ~/.bashrc
 source ~/.bashrc
 
 # Install 
-sudo apt -y install xsel tree
+sudo apt -y install xsel tree bc
 ```
 
