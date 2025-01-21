@@ -36,7 +36,7 @@ print_debug() {
 
 # Default values
 PATHS=()                                         # Array to store multiple input paths
-IGNORE_PATHS=("node_modules" ".*" "__pycache__" ".git") # Auto-ignore node_modules, dotfiles, and git
+IGNORE_PATHS=("node_modules" ".*" "__pycache__" ".git" "package-lock.json") # Auto-ignore node_modules, dotfiles, and git
 TEMP_FILE="/tmp/ai-digest-$$.md"
 CLIPBOARD_CMD=""
 MAX_SIZE_MB=10 # Maximum size limit in MB
