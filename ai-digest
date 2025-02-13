@@ -36,7 +36,7 @@ print_debug() {
 
 # Default values
 PATHS=()                                         # Array to store multiple input paths
-IGNORE_PATHS=("node_modules" ".*" "__pycache__" ".git" "package-lock.json") # Auto-ignore node_modules, dotfiles, and git
+IGNORE_PATHS=("node_modules" ".*" "__pycache__" ".git" "package-lock.json", "build", "assets") # Auto-ignores
 TEMP_FILE="/tmp/ai-digest-$$.md"
 CLIPBOARD_CMD=""
 MAX_SIZE_MB=10 # Maximum size limit in MB
@@ -258,17 +258,39 @@ create_markdown() {
         return 0
     fi
 
-    # Process all files recursively
     local any_files_processed=false
-
-    # Use find to get all files recursively, excluding ignored paths
+    
+    # Build prune conditions for find
+    local prune_conditions=""
+    for ignore_path in "${IGNORE_PATHS[@]}"; do
+        if [[ "$ignore_path" != ".*" ]]; then  # Handle dotfiles separately
+            prune_conditions="$prune_conditions -name $ignore_path -o"
+        fi
+    done
+    
+    # Remove trailing "-o" if it exists
+    prune_conditions="${prune_conditions% -o}"
+    
+    # Construct find command with pruning
+    local find_cmd="find \"$current_path\""
+    if [ ! -z "$prune_conditions" ]; then
+        find_cmd="$find_cmd \( $prune_conditions \) -prune -o"
+    fi
+    # Add condition to ignore dotfiles
+    find_cmd="$find_cmd -not -path '*/\.*'"
+    # Finally, add the -type f to only find files
+    find_cmd="$find_cmd -type f -print0"
+    
+    print_debug "Executing find command: $find_cmd"
+    
+    # Execute the constructed find command
     while IFS= read -r -d '' file; do
         if process_file "$file" "$base_path"; then
             any_files_processed=true
         else
             return 1
         fi
-    done < <(find "$current_path" -type f -print0 | sort -z)
+    done < <(eval "$find_cmd" | sort -z)
 
     [ "$any_files_processed" = false ] && print_debug "No files processed in: $current_path"
     return 0
