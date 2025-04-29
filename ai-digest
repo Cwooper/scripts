@@ -36,7 +36,7 @@ print_debug() {
 
 # Default values
 PATHS=()                                         # Array to store multiple input paths
-IGNORE_PATHS=("node_modules" ".*" "__pycache__" ".git" "package-lock.json" "build" "assets") # Auto-ignores
+IGNORE_PATHS=("node_modules" ".*" "__pycache__" "venv" ".git" "package-lock.json" "build" "dist" "assets") # Auto-ignores
 TEMP_FILE="/tmp/ai-digest-$$.md"
 CLIPBOARD_CMD=""
 MAX_SIZE_MB=10 # Maximum size limit in MB
@@ -82,10 +82,11 @@ show_help() {
       $(basename "$0") [paths...] [options]
 
     ${BOLD}OPTIONS${NC}
-      ${CYAN}-i${NC}, ${CYAN}--ignore${NC}   PATTERN   Additional paths to ignore (repeatable)
-      ${CYAN}-m${NC}, ${CYAN}--max-size${NC} SIZE      Maximum size in MB (default: 10)
-      ${CYAN}-d${NC}, ${CYAN}--debug${NC}              Enable debug output
-      ${CYAN}-h${NC}, ${CYAN}--help${NC}               Show this help message
+      ${CYAN}-i${NC},  ${CYAN}--ignore${NC}   PATTERN   Additional paths to ignore (repeatable)
+      ${CYAN}-m${NC},  ${CYAN}--max-size${NC} SIZE      Maximum size in MB (default: 10)
+      ${CYAN}-d${NC},  ${CYAN}--debug${NC}              Enable debug output
+      ${CYAN}-h${NC},  ${CYAN}--help${NC}               Show this help message
+      ${CYAN}-gi${NC}, ${CYAN}--gitignore${NC}          Use gitignore for ignoring files
 
     ${BOLD}EXAMPLES${NC}
       $(basename "$0")                            # Process current directory
