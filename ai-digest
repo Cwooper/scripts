@@ -42,6 +42,7 @@ CLIPBOARD_CMD=""
 MAX_SIZE_MB=10 # Maximum size limit in MB
 CURRENT_SIZE=0
 DEBUG=false
+USE_GITIGNORE=false
 
 # Check for required commands
 if ! command -v bc >/dev/null 2>&1; then
@@ -119,6 +120,10 @@ while [[ $# -gt 0 ]]; do
         show_help
         exit 0
         ;;
+    -gi | --gitignore)
+        USE_GITIGNORE=true
+        shift
+        ;;
     -*)
         print_error "Unknown option: $1"
         show_help
@@ -141,10 +146,55 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Function to parse .gitignore and add to IGNORE_PATHS
+parse_gitignore() {
+    local gitignore_file="$1"
+
+    if [ ! -f "$gitignore_file" ]; then
+        print_debug ".gitignore not found at: $gitignore_file"
+        return
+    fi
+
+    print_debug "Parsing .gitignore: $gitignore_file"
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip empty lines and comments
+        if [[ -z "$line" || "$line" =~ ^# ]]; then
+            continue
+        fi
+        # Normalize: Remove leading "./" and trailing slashes
+        normalized=$(echo "$line" | sed 's|^\./||' | sed 's|/$||')
+        if [ -n "$normalized" ]; then
+            IGNORE_PATHS+=("$normalized")
+            print_debug "Added gitignore pattern: $normalized"
+        fi
+    done < "$gitignore_file"
+}
+
 # If no paths were provided, use current directory
 if [ ${#PATHS[@]} -eq 0 ]; then
     print_debug "No paths provided, using current directory"
-    PATHS+=("$(pwd)")
+    PATHS+=("$(pwd)") 
+fi
+
+# Parse .gitignore if requested
+if [ "$USE_GITIGNORE" = true ]; then
+    for path in "${PATHS[@]}"; do
+        if [ -d "$path" ]; then
+            if [ -f "$path/.gitignore" ]; then
+                parse_gitignore "$path/.gitignore"
+            else
+                print_debug "No .gitignore found in $path"
+            fi
+        else
+            dir_path=$(dirname "$path")
+            if [ -f "$dir_path/.gitignore" ]; then
+                parse_gitignore "$dir_path/.gitignore"
+            else
+                print_debug "No .gitignore found in $dir_path"
+            fi
+        fi
+    done
 fi
 
 # Check if clipboard command is available
@@ -264,7 +314,12 @@ create_markdown() {
     local prune_conditions=""
     for ignore_path in "${IGNORE_PATHS[@]}"; do
         if [[ "$ignore_path" != ".*" ]]; then  # Handle dotfiles separately
-            prune_conditions="$prune_conditions -name $ignore_path -o"
+            if [[ "$ignore_path" == */* ]]; then
+                # If pattern has a slash, use wholename
+                prune_conditions="$prune_conditions -wholename \"*/$ignore_path\" -o"
+            else
+                prune_conditions="$prune_conditions -name \"$ignore_path\" -o"
+            fi
         fi
     done
     
@@ -316,6 +371,7 @@ format_size() {
     size=$(echo $size | awk '{printf "%.2f\n", $0}' | sed 's/\.00$//')
     echo "${size}${units[$unit]}"
 }
+
 
 # Create temporary file
 >"$TEMP_FILE"
