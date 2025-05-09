@@ -35,7 +35,7 @@ print_debug() {
 }
 
 # Default values
-PATHS=()                                         # Array to store multiple input paths
+PATHS=()                                                                                                   # Array to store multiple input paths
 IGNORE_PATHS=("node_modules" ".*" "__pycache__" "venv" ".git" "package-lock.json" "build" "dist" "assets") # Auto-ignores
 TEMP_FILE="/tmp/ai-digest-$$.md"
 CLIPBOARD_CMD=""
@@ -169,31 +169,47 @@ parse_gitignore() {
             IGNORE_PATHS+=("$normalized")
             print_debug "Added gitignore pattern: $normalized"
         fi
-    done < "$gitignore_file"
+    done <"$gitignore_file"
 }
 
 # If no paths were provided, use current directory
 if [ ${#PATHS[@]} -eq 0 ]; then
     print_debug "No paths provided, using current directory"
-    PATHS+=("$(pwd)") 
+    PATHS+=("$(pwd)")
 fi
+
+# Function to find .gitignore in current directory or any parent directory
+find_gitignore() {
+    local current_dir="$1"
+    local gitignore_path=""
+
+    # Walk up the directory tree
+    while [ "$current_dir" != "/" ]; do
+        if [ -f "$current_dir/.gitignore" ]; then
+            gitignore_path="$current_dir/.gitignore"
+            break
+        fi
+        current_dir=$(dirname "$current_dir")
+    done
+
+    echo "$gitignore_path"
+}
 
 # Parse .gitignore if requested
 if [ "$USE_GITIGNORE" = true ]; then
     for path in "${PATHS[@]}"; do
         if [ -d "$path" ]; then
-            if [ -f "$path/.gitignore" ]; then
-                parse_gitignore "$path/.gitignore"
-            else
-                print_debug "No .gitignore found in $path"
-            fi
+            gitignore_path=$(find_gitignore "$path")
         else
             dir_path=$(dirname "$path")
-            if [ -f "$dir_path/.gitignore" ]; then
-                parse_gitignore "$dir_path/.gitignore"
-            else
-                print_debug "No .gitignore found in $dir_path"
-            fi
+            gitignore_path=$(find_gitignore "$dir_path")
+        fi
+
+        if [ -n "$gitignore_path" ]; then
+            print_debug "Found .gitignore at: $gitignore_path"
+            parse_gitignore "$gitignore_path"
+        else
+            print_debug "No .gitignore found for path: $path"
         fi
     done
 fi
@@ -310,11 +326,11 @@ create_markdown() {
     fi
 
     local any_files_processed=false
-    
+
     # Build prune conditions for find
     local prune_conditions=""
     for ignore_path in "${IGNORE_PATHS[@]}"; do
-        if [[ "$ignore_path" != ".*" ]]; then  # Handle dotfiles separately
+        if [[ "$ignore_path" != ".*" ]]; then # Handle dotfiles separately
             if [[ "$ignore_path" == */* ]]; then
                 # If pattern has a slash, use wholename
                 prune_conditions="$prune_conditions -wholename \"*/$ignore_path\" -o"
@@ -323,10 +339,10 @@ create_markdown() {
             fi
         fi
     done
-    
+
     # Remove trailing "-o" if it exists
     prune_conditions="${prune_conditions% -o}"
-    
+
     # Construct find command with pruning
     local find_cmd="find \"$current_path\""
     if [ ! -z "$prune_conditions" ]; then
@@ -336,9 +352,9 @@ create_markdown() {
     find_cmd="$find_cmd -not -path '*/\.*'"
     # Finally, add the -type f to only find files
     find_cmd="$find_cmd -type f -print0"
-    
+
     print_debug "Executing find command: $find_cmd"
-    
+
     # Execute the constructed find command
     while IFS= read -r -d '' file; do
         if process_file "$file" "$base_path"; then
@@ -373,7 +389,6 @@ format_size() {
     echo "${size}${units[$unit]}"
 }
 
-
 # Create temporary file
 >"$TEMP_FILE"
 
@@ -385,7 +400,7 @@ echo >>"$TEMP_FILE"
 # Process each input path
 for path in "${PATHS[@]}"; do
     print_status "Processing: $path"
-    
+
     if [ -f "$path" ]; then
         # Process single file
         if ! process_file "$path" "$(dirname "$path")"; then
@@ -407,10 +422,13 @@ for path in "${PATHS[@]}"; do
                     all_ignores+=("$pattern")
                 fi
             done
-            
+
             # Join patterns with |
-            ignore_pattern=$(IFS='|'; echo "${all_ignores[*]}")
-            
+            ignore_pattern=$(
+                IFS='|'
+                echo "${all_ignores[*]}"
+            )
+
             # Run tree with combined ignore pattern
             tree --charset=ascii -I "$ignore_pattern" --dirsfirst "$path" 2>/dev/null >>"$TEMP_FILE"
 
