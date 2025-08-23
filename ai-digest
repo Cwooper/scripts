@@ -228,19 +228,22 @@ if [ "$DEBUG" = true ]; then
 fi
 
 # Function to check if path should be ignored
+# Should be similar to how .gitignore handles it to reduce false positives
+# and also because we optionally import .gitignore patterns with -gi
 should_ignore() {
     local check_path="$1"
     local base_name=$(basename "$check_path")
-
-    # Check against ignore patterns
-    for ignore_path in "${IGNORE_PATHS[@]}"; do
-        # Handle glob patterns (like .*)
-        if [[ "$base_name" == $ignore_path ]]; then
-            return 0
-        fi
-        # Handle exact matches
-        if [[ "$check_path" == *"$ignore_path"* ]]; then
-            return 0
+    
+    for pattern in "${IGNORE_PATHS[@]}"; do
+        if [[ "$pattern" == */ ]]; then
+            # Directory-only pattern
+            [[ -d "$check_path" ]] && [[ "$base_name" == ${pattern%/} ]] && return 0
+        elif [[ "$pattern" == */* ]]; then
+            # Path contains slash - match full relative path
+            [[ "$check_path" == */$pattern ]] || [[ "$check_path" == */$pattern/* ]] && return 0
+        else
+            # Simple filename pattern - exact basename match only
+            [[ "$base_name" == $pattern ]] && return 0
         fi
     done
     return 1
