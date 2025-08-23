@@ -335,8 +335,9 @@ create_markdown() {
     for ignore_path in "${IGNORE_PATHS[@]}"; do
         if [[ "$ignore_path" != ".*" ]]; then # Handle dotfiles separately
             if [[ "$ignore_path" == */* ]]; then
-                # If pattern has a slash, use wholename
-                prune_conditions="$prune_conditions -wholename \"*/$ignore_path\" -o"
+                # If pattern has a slash, use wholename (strip trailing slash)
+                local pattern="${ignore_path%/}"  # Remove trailing slash if present
+                prune_conditions="$prune_conditions -wholename \"*/$pattern\" -o"
             else
                 prune_conditions="$prune_conditions -name \"$ignore_path\" -o"
             fi
